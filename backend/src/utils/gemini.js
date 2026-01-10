@@ -18,7 +18,7 @@ async function generateResponse(userQuery, campusData) {
     const temperature = hasData ? 0.4 : 0.7;
     
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-pro",
       generationConfig: {
         maxOutputTokens: 1000,
         temperature: temperature,
