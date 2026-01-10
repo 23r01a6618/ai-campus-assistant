@@ -1,18 +1,9 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const axios = require('axios');
 
-let genAI = null;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
-// Initialize Gemini with proper error handling
-try {
-  if (process.env.GEMINI_API_KEY) {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    console.log('✅ Gemini API initialized successfully');
-  } else {
-    console.warn('⚠️ GEMINI_API_KEY not found in .env file');
-  }
-} catch (error) {
-  console.error('❌ Failed to initialize Gemini:', error.message);
-}
+console.log('🔍 Gemini API Key configured:', !!GEMINI_API_KEY);
 
 /**
  * Generate AI response using Gemini with campus context
@@ -22,78 +13,55 @@ try {
  */
 async function generateResponse(userQuery, campusData) {
   try {
-    // If Gemini not initialized, use demo mode
-    if (!genAI) {
-      console.log('📝 Gemini not initialized, using demo response');
+    if (!GEMINI_API_KEY) {
+      console.log('📝 No API key, using fallback responses');
       return generateDemoResponse(userQuery, campusData);
     }
 
-    // Determine if we have campus data to work with
     const hasData = campusData && Object.keys(campusData).length > 0 && Object.values(campusData).some(arr => arr && arr.length > 0);
     
-    // Use higher temperature for more thoughtful responses
-    const temperature = 0.7;
+    console.log('🤖 Calling Gemini API...');
     
-    console.log('🤖 Calling Gemini API for:', userQuery.substring(0, 60) + '...');
-    
-    const model = genAI.getGenerativeModel({
-      model: "gemini-pro",
-      generationConfig: {
-        maxOutputTokens: 1500,
-        temperature: temperature,
-        topP: 0.95,
-        topK: 40,
-      }
-    });
-
     const prompt = buildPrompt(userQuery, campusData);
 
-    console.log('📤 Sending prompt to Gemini...');
-    const result = await model.generateContent(prompt);
-    
-    console.log('📥 Receiving response from Gemini...');
-    const response = await result.response;
-    const text = response.text();
+    const response = await axios.post(
+      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 1500
+        }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      }
+    );
 
-    console.log('✅ Gemini API response received:', text.substring(0, 100) + '...');
-    return text || "I couldn't generate a response. Please try again.";
+    if (response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content) {
+      const text = response.data.candidates[0].content.parts[0].text;
+      console.log('✅ Gemini API response received');
+      return text || "I couldn't generate a response. Please try again.";
+    }
+
+    console.log('⚠️ Unexpected response format');
+    return generateDemoResponse(userQuery, campusData);
+
   } catch (error) {
     console.error('❌ Gemini API error:', error.message);
     if (error.response?.status === 404) {
-      console.error('Model not found - trying with gemini-1.5-flash...');
-      return generateResponseWithFallbackModel(userQuery, campusData);
+      console.error('Model not found - API key may not have proper access');
     }
-    
-    // Fallback: Return a demo response if Gemini API fails
-    console.log('📝 Using fallback mode (Gemini API unavailable)');
-    return generateDemoResponse(userQuery, campusData);
-  }
-}
-
-/**
- * Try with fallback model if primary model fails
- */
-async function generateResponseWithFallbackModel(userQuery, campusData) {
-  try {
-    if (!genAI) return generateDemoResponse(userQuery, campusData);
-    
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        maxOutputTokens: 1500,
-        temperature: 0.7,
-      }
-    });
-
-    const prompt = buildPrompt(userQuery, campusData);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    console.log('✅ Fallback model response received');
-    return text || "I couldn't generate a response. Please try again.";
-  } catch (fallbackError) {
-    console.error('❌ Fallback model also failed:', fallbackError.message);
+    console.log('📝 Using fallback mode');
     return generateDemoResponse(userQuery, campusData);
   }
 }
@@ -181,7 +149,6 @@ User Question: ${userQuery}
 Please provide a helpful, thoughtful response:`;
 
   return basePrompt;
-}
 }
 
 module.exports = { generateResponse };
