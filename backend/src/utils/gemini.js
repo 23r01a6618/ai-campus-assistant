@@ -1,6 +1,18 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+let genAI = null;
+
+// Initialize Gemini with proper error handling
+try {
+  if (process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    console.log('✅ Gemini API initialized successfully');
+  } else {
+    console.warn('⚠️ GEMINI_API_KEY not found in .env file');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize Gemini:', error.message);
+}
 
 /**
  * Generate AI response using Gemini with campus context
@@ -10,43 +22,78 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  */
 async function generateResponse(userQuery, campusData) {
   try {
-    // Verify API key is loaded
-    if (!process.env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY is not set in .env file');
+    // If Gemini not initialized, use demo mode
+    if (!genAI) {
+      console.log('📝 Gemini not initialized, using demo response');
       return generateDemoResponse(userQuery, campusData);
     }
 
     // Determine if we have campus data to work with
     const hasData = campusData && Object.keys(campusData).length > 0 && Object.values(campusData).some(arr => arr && arr.length > 0);
     
-    // Use slightly higher temperature for general knowledge (more creative/thoughtful)
-    // Use lower temperature for campus data (more factual)
-    const temperature = hasData ? 0.4 : 0.7;
+    // Use higher temperature for more thoughtful responses
+    const temperature = 0.7;
     
-    console.log('🤖 Calling Gemini API with query:', userQuery.substring(0, 50) + '...');
+    console.log('🤖 Calling Gemini API for:', userQuery.substring(0, 60) + '...');
     
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-pro",
       generationConfig: {
-        maxOutputTokens: 1000,
+        maxOutputTokens: 1500,
         temperature: temperature,
+        topP: 0.95,
+        topK: 40,
       }
     });
 
     const prompt = buildPrompt(userQuery, campusData);
 
+    console.log('📤 Sending prompt to Gemini...');
+    const result = await model.generateContent(prompt);
+    
+    console.log('📥 Receiving response from Gemini...');
+    const response = await result.response;
+    const text = response.text();
+
+    console.log('✅ Gemini API response received:', text.substring(0, 100) + '...');
+    return text || "I couldn't generate a response. Please try again.";
+  } catch (error) {
+    console.error('❌ Gemini API error:', error.message);
+    if (error.response?.status === 404) {
+      console.error('Model not found - trying with gemini-1.5-flash...');
+      return generateResponseWithFallbackModel(userQuery, campusData);
+    }
+    
+    // Fallback: Return a demo response if Gemini API fails
+    console.log('📝 Using fallback mode (Gemini API unavailable)');
+    return generateDemoResponse(userQuery, campusData);
+  }
+}
+
+/**
+ * Try with fallback model if primary model fails
+ */
+async function generateResponseWithFallbackModel(userQuery, campusData) {
+  try {
+    if (!genAI) return generateDemoResponse(userQuery, campusData);
+    
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        maxOutputTokens: 1500,
+        temperature: 0.7,
+      }
+    });
+
+    const prompt = buildPrompt(userQuery, campusData);
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    console.log('✅ Gemini API response received successfully');
+    console.log('✅ Fallback model response received');
     return text || "I couldn't generate a response. Please try again.";
-  } catch (error) {
-    console.error('❌ Gemini API error:', error.message);
-    console.error('Error details:', error);
-    
-    // Fallback: Return a demo response if Gemini API fails
-    console.log('📝 Using demo response mode (Gemini API unavailable)');
+  } catch (fallbackError) {
+    console.error('❌ Fallback model also failed:', fallbackError.message);
     return generateDemoResponse(userQuery, campusData);
   }
 }
@@ -113,43 +160,28 @@ function buildPrompt(userQuery, campusData) {
     });
   }
 
-  const basePrompt = `You are an intelligent and helpful AI assistant for our campus community. You have knowledge about campus events, clubs, facilities, dining options, and academic matters. You also have extensive general knowledge to answer any questions users ask.
+  const basePrompt = `You are an intelligent and helpful AI assistant for a campus community, similar to Google's Gemini. You should respond naturally, conversationally, and thoughtfully - just like you would in a regular conversation.
 
-YOUR ROLE:
-- Provide helpful, accurate information about campus-related topics using the data below
-- If campus data is available, prioritize it in your response
-- If no specific campus data matches the query, use your general knowledge to provide THOUGHTFUL, DETAILED answers
-- Give friendly, conversational responses (not robotic)
-- Answer ANY question the user asks, whether campus-related or general knowledge
-- Think deeply and provide practical, actionable information
+${hasData ? `You have access to this campus information:
+${dataString}` : ``}
 
-${hasData ? `AVAILABLE CAMPUS DATA:
-${dataString}
+Guidelines:
+- Be conversational and natural, not robotic
+- Provide detailed, thoughtful answers
+- If campus data is relevant, use it; otherwise use your general knowledge
+- For academic/study questions: Give practical, actionable tips
+- For campus questions: Use the data if available, otherwise provide helpful context
+- Think through the answer before responding
+- Use simple, clear language
+- Include relevant emojis when appropriate
+- Don't be overly brief - provide good detail
 
-INSTRUCTIONS:
-1. If the user's question relates to the campus data above, use that information and enhance with helpful context
-2. If the campus data doesn't answer the question, provide comprehensive general knowledge-based answers
-3. Be helpful, accurate, and conversational while remaining factual
-4. For menu/food items: Format nicely with prices and availability clearly shown
-5. For specific item queries (price, availability): Provide direct, clear answers
-6. For general knowledge questions: Think deeply and provide practical, actionable advice
-7. Keep responses friendly and concise (2-4 sentences typically)
-8. Use relevant emojis to make responses more engaging` : `INSTRUCTIONS:
-1. The user is asking a question that isn't in this campus's database
-2. Use your general knowledge and THINK DEEPLY about the topic to provide a helpful, thorough answer
-3. Be friendly, conversational, informative, and practical
-4. Provide actionable advice and real insights based on your knowledge
-5. For exam-related questions: Discuss study strategies, time management, preparation tips, etc.
-6. For academic topics: Provide explanations, examples, and practical guidance
-7. Keep responses friendly and concise but substantive (3-5 sentences is fine for complex topics)
-8. Use relevant emojis to make responses more engaging`}
+User Question: ${userQuery}
 
-USER QUESTION: ${userQuery}
-
-RESPONSE:
-Think carefully about the question and provide a thoughtful, helpful answer based on your knowledge.`;
+Please provide a helpful, thoughtful response:`;
 
   return basePrompt;
+}
 }
 
 module.exports = { generateResponse };
