@@ -1,15 +1,11 @@
 const axios = require('axios');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
 console.log('🔍 Gemini API Key configured:', !!GEMINI_API_KEY);
 
 /**
  * Generate AI response using Gemini with campus context
- * @param {string} userQuery - User's question
- * @param {Object} campusData - Relevant campus information
- * @returns {Promise<string>} - AI-generated response
  */
 async function generateResponse(userQuery, campusData) {
   try {
@@ -18,50 +14,73 @@ async function generateResponse(userQuery, campusData) {
       return generateDemoResponse(userQuery, campusData);
     }
 
-    const hasData = campusData && Object.keys(campusData).length > 0 && Object.values(campusData).some(arr => arr && arr.length > 0);
-    
     console.log('🤖 Calling Gemini API...');
     
     const prompt = buildPrompt(userQuery, campusData);
 
-    const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+    // Try multiple endpoints and models
+    const endpoints = [
       {
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.95,
-          topK: 40,
-          maxOutputTokens: 1500
-        }
+        url: `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        model: 'gemini-2.0-flash'
       },
       {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+        model: 'gemini-1.5-pro'
+      },
+      {
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+        model: 'gemini-pro'
       }
-    );
+    ];
 
-    if (response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content) {
-      const text = response.data.candidates[0].content.parts[0].text;
-      console.log('✅ Gemini API response received');
-      return text || "I couldn't generate a response. Please try again.";
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`  Trying ${endpoint.model}...`);
+        
+        const response = await axios.post(
+          endpoint.url,
+          {
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.9,
+              maxOutputTokens: 1500
+            },
+            safetySettings: [
+              {
+                category: "HARM_CATEGORY_UNSPECIFIED",
+                threshold: "BLOCK_NONE"
+              }
+            ]
+          },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 15000
+          }
+        );
+
+        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          const text = response.data.candidates[0].content.parts[0].text;
+          console.log(`✅ ${endpoint.model} response received`);
+          return text;
+        }
+      } catch (err) {
+        console.log(`  ⚠️ ${endpoint.model} failed:`, err.response?.status || err.message);
+        // Continue to next endpoint
+        continue;
+      }
     }
 
-    console.log('⚠️ Unexpected response format');
+    // If all endpoints fail, use demo
+    console.log('❌ All Gemini endpoints failed');
     return generateDemoResponse(userQuery, campusData);
 
   } catch (error) {
-    console.error('❌ Gemini API error:', error.message);
-    if (error.response?.status === 404) {
-      console.error('Model not found - API key may not have proper access');
-    }
-    console.log('📝 Using fallback mode');
+    console.error('❌ Gemini error:', error.message);
     return generateDemoResponse(userQuery, campusData);
   }
 }
