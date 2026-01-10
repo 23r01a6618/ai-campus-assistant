@@ -41,9 +41,12 @@ async function handleChat(req, res) {
     let aiResponse = "";
     const hasResults = Object.values(campusResults).some(arr => arr && arr.length > 0);
     
+    // Only show campus data if there are actual relevant results
+    // Don't force campus context for general knowledge questions
+    let contextData = {};
+    
     if (hasResults) {
-      // Build context data for Gemini
-      const contextData = {};
+      // Build context data for Gemini only if we have relevant results
       if (campusResults.canteen_items && campusResults.canteen_items.length > 0) {
         contextData.canteen_items = campusResults.canteen_items;
       }
@@ -62,13 +65,12 @@ async function handleChat(req, res) {
       if (campusResults.faqs && campusResults.faqs.length > 0) {
         contextData.faqs = campusResults.faqs;
       }
-
-      // Generate Gemini response with context data
-      aiResponse = await generateResponse(message, contextData);
-    } else {
-      // No data found - let Gemini provide helpful guidance
-      aiResponse = await generateResponse(message, {});
     }
+
+    // Generate Gemini response
+    // If no campus data found, Gemini will handle as general knowledge question
+    // If campus data found, Gemini will incorporate it
+    aiResponse = await generateResponse(message, contextData);
 
     // Format into structured response for frontend
     const structuredResponse = createStructuredResponse(message, campusResults);

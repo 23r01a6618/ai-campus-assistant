@@ -18,58 +18,59 @@ async function generateResponse(userQuery, campusData) {
     
     const prompt = buildPrompt(userQuery, campusData);
 
-    // Use the simplest, most reliable endpoint
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    // Use valid Gemini models from the API
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     try {
-      console.log('  Trying gemini-pro...');
+      console.log('  Trying gemini-2.0-flash model...');
       
-      const response = await axios.post(
-        url,
-        {
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 2048
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
           }
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 20000
-        }
-      );
+        ]
+      };
+
+      console.log('📤 Sending request to Gemini API...');
+      
+      const response = await axios.post(url, requestBody, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 30000
+      });
+
+      console.log('📥 Response received');
 
       if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         const text = response.data.candidates[0].content.parts[0].text;
-        console.log('✅ Gemini API response received');
+        console.log('✅ Gemini API success - response text received');
         return text;
       }
 
-      console.log('⚠️ Unexpected response format');
+      console.log('⚠️ Response format unexpected:', JSON.stringify(response.data).substring(0, 200));
       return generateDemoResponse(userQuery, campusData);
 
     } catch (err) {
-      console.log('  ⚠️ gemini-pro failed:', err.response?.status || err.message);
+      const status = err.response?.status;
+      const errorMsg = err.response?.data?.error?.message || err.message;
       
-      // If 400 error, show what went wrong
-      if (err.response?.status === 400) {
-        console.error('  Error details:', err.response?.data?.error?.message);
+      console.log(`  ⚠️ gemini-pro failed with status ${status}`);
+      console.error(`  Error: ${errorMsg}`);
+      
+      // Log first 500 chars of error response for debugging
+      if (err.response?.data) {
+        console.error('  Full error:', JSON.stringify(err.response.data).substring(0, 500));
       }
       
       return generateDemoResponse(userQuery, campusData);
     }
 
   } catch (error) {
-    console.error('❌ Gemini error:', error.message);
+    console.error('❌ Unexpected error:', error.message);
     return generateDemoResponse(userQuery, campusData);
   }
 }

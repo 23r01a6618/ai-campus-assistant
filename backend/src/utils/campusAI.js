@@ -184,16 +184,15 @@ async function generateCampusResponse(userQuery) {
 
     const queryLower = userQuery.toLowerCase();
     
-    // More flexible event detection - matches "about X day", "tell me about event", etc.
+    // More specific event detection - only if explicitly asking about campus events
     const hasEventIndicators = queryLower.includes('event') || 
-                               queryLower.includes('day') || 
                                queryLower.includes('festival') || 
                                queryLower.includes('celebration') ||
                                queryLower.includes('happening') ||
                                queryLower.includes('coming') ||
                                queryLower.includes('upcoming') ||
-                               queryLower.includes('when') ||
-                               queryLower.includes('about') && keywords.length > 0; // "about X" queries are likely event-specific
+                               (queryLower.includes('day') && (queryLower.includes('about') || queryLower.includes('tell'))) ||
+                               queryLower.includes('when');
     
     // Search events
     if (hasEventIndicators || keywords.some(k => ["event", "events", "happening", "coming", "festival"].includes(k))) {
