@@ -132,25 +132,6 @@ async function searchCampusData(keywords) {
   }
 }
 
-    // Search FAQs - ONLY if explicitly asked (contains "faq" or "question" or similar)
-    if (keywords.some(k => ["faq", "faqs", "question", "questions"].includes(k))) {
-      const faqsSnap = await db.collection("faqs").limit(10).get();
-      results.faqs = faqsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-
-    // Search academic info
-    if (keywords.some(k => ["academic", "semester", "exam", "schedule", "grade", "course"])) {
-      const academicSnap = await db.collection("academic_info").limit(10).get();
-      results.academic_info = academicSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-
-    return results;
-  } catch (error) {
-    console.error("Error searching campus data:", error);
-    return { events: [], clubs: [], facilities: [], faqs: [], academic_info: [] };
-  }
-}
-
 /**
  * Find best matching items from search results
  */
