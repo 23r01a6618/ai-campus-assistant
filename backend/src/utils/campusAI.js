@@ -57,7 +57,7 @@ function getEditDistance(s1, s2) {
 }
 
 /**
- * Fetch and search campus data
+ * Search for campus data based on keywords
  */
 async function searchCampusData(keywords) {
   if (!isFirebaseInitialized) {
@@ -74,29 +74,63 @@ async function searchCampusData(keywords) {
       canteen_items: [],
     };
 
+    // Expand keyword matching to be more flexible
+    const hasEventKeywords = keywords.some(k => 
+      ["event", "events", "happening", "coming", "festival", "day", "day", "celebration", "program", "schedule", "when", "what's"].includes(k)
+    );
+    
+    const hasClubKeywords = keywords.some(k => 
+      ["club", "clubs", "society", "group", "team", "organization"].includes(k)
+    );
+    
+    const hasFacilityKeywords = keywords.some(k => 
+      ["facility", "facilities", "library", "cafeteria", "sports", "lab", "gym", "where", "location", "place", "building"].includes(k)
+    );
+    
+    const hasFoodKeywords = keywords.some(k => 
+      ["food", "canteen", "menu", "eat", "lunch", "breakfast", "dinner", "coffee", "snack", "item", "price"].includes(k)
+    );
+    
+    const hasAcademicKeywords = keywords.some(k => 
+      ["academic", "semester", "exam", "schedule", "grade", "course", "registration", "class"].includes(k)
+    );
+
     // Search events
-    if (keywords.some(k => ["event", "events", "happening", "coming"].includes(k))) {
-      const eventsSnap = await db.collection("events").limit(10).get();
+    if (hasEventKeywords) {
+      const eventsSnap = await db.collection("events").limit(20).get();
       results.events = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
     // Search clubs
-    if (keywords.some(k => ["club", "clubs", "society", "group"].includes(k))) {
-      const clubsSnap = await db.collection("clubs").limit(10).get();
+    if (hasClubKeywords) {
+      const clubsSnap = await db.collection("clubs").limit(20).get();
       results.clubs = clubsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
     // Search facilities
-    if (keywords.some(k => ["facility", "facilities", "library", "cafeteria", "sports", "lab", "gym"].includes(k))) {
-      const facilitiesSnap = await db.collection("facilities").limit(10).get();
+    if (hasFacilityKeywords) {
+      const facilitiesSnap = await db.collection("facilities").limit(20).get();
       results.facilities = facilitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
     // Search canteen items
-    if (keywords.some(k => ["food", "canteen", "menu", "eat", "lunch", "breakfast", "dinner", "coffee", "snack"].includes(k))) {
-      const canteenSnap = await db.collection("canteen_items").limit(10).get();
+    if (hasFoodKeywords) {
+      const canteenSnap = await db.collection("canteen_items").limit(20).get();
       results.canteen_items = canteenSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
+
+    // Search academic info
+    if (hasAcademicKeywords) {
+      const academicSnap = await db.collection("academic_info").limit(20).get();
+      results.academic_info = academicSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    return results;
+  } catch (error) {
+    console.error("Error searching campus data:", error);
+    return { events: [], clubs: [], facilities: [], faqs: [], academic_info: [] };
+  }
+}
 
     // Search FAQs - ONLY if explicitly asked (contains "faq" or "question" or similar)
     if (keywords.some(k => ["faq", "faqs", "question", "questions"].includes(k))) {
@@ -167,13 +201,26 @@ async function generateCampusResponse(userQuery) {
       canteen_items: [],
     };
 
+    const queryLower = userQuery.toLowerCase();
+    
+    // More flexible event detection - matches "about X day", "tell me about event", etc.
+    const hasEventIndicators = queryLower.includes('event') || 
+                               queryLower.includes('day') || 
+                               queryLower.includes('festival') || 
+                               queryLower.includes('celebration') ||
+                               queryLower.includes('happening') ||
+                               queryLower.includes('coming') ||
+                               queryLower.includes('upcoming') ||
+                               queryLower.includes('when') ||
+                               queryLower.includes('about') && keywords.length > 0; // "about X" queries are likely event-specific
+    
     // Search events
-    if (keywords.some(k => ["event", "events", "happening", "coming", "festival"].includes(k))) {
+    if (hasEventIndicators || keywords.some(k => ["event", "events", "happening", "coming", "festival"].includes(k))) {
       results.events = await fetchAndMatchEvents(userQuery);
     }
 
     // Search clubs
-    if (keywords.some(k => ["club", "clubs", "society", "group", "team"].includes(k))) {
+    if (queryLower.includes('club') || queryLower.includes('clubs') || queryLower.includes('society') || keywords.some(k => ["club", "clubs", "society", "group", "team"].includes(k))) {
       results.clubs = await fetchAndMatchClubs(userQuery);
     }
 
@@ -221,25 +268,62 @@ async function fetchAndMatchEvents(query) {
     const snapshot = await db.collection("events").get();
     const allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
+    if (allEvents.length === 0) return [];
+    
     // Check if user is asking for a specific event or all events
     const queryLower = query.toLowerCase();
     const isGeneralQuery = queryLower.includes('all events') || queryLower.includes('list all') || queryLower.includes('show all events') || queryLower.includes('upcoming events') || (queryLower.includes('list') && queryLower.includes('event'));
     
-    // For specific event queries, return only 1 match with moderate threshold
-    // For general queries, return more with lower threshold
-    let limit = 1;
-    let threshold = 0.3;
-    
-    if (isGeneralQuery) {
-      limit = 100;
-      threshold = 0.1;
+    // For specific event queries, try to find exact matches first
+    if (!isGeneralQuery) {
+      const specificMatch = findEventMatch(queryLower, allEvents);
+      if (specificMatch) return [specificMatch];
     }
+    
+    // For general queries or when specific match not found, return more with lower threshold
+    let limit = isGeneralQuery ? 100 : 5;
+    let threshold = isGeneralQuery ? 0.1 : 0.2;
     
     return findBestMatches(query, { events: allEvents }, "events", threshold, limit);
   } catch (error) {
     console.error("Error fetching events:", error);
     return [];
   }
+}
+
+/**
+ * Find specific event by name or keywords
+ */
+function findEventMatch(queryLower, events) {
+  // Extract possible event name from query (e.g., "about freshers day" -> "freshers day")
+  const words = queryLower.split(/\s+/).filter(w => w.length > 2);
+  
+  // Try exact name match first
+  for (const event of events) {
+    const eventName = (event.name || event.title || event.eventName || '').toLowerCase();
+    if (eventName === queryLower || eventName === words.join(' ')) {
+      return event;
+    }
+  }
+  
+  // Try partial name match
+  for (const event of events) {
+    const eventName = (event.name || event.title || event.eventName || '').toLowerCase();
+    if (eventName.length > 0 && words.every(word => eventName.includes(word))) {
+      return event;
+    }
+  }
+  
+  // Try matching event name with query keywords
+  for (const event of events) {
+    const eventName = (event.name || event.title || event.eventName || '').toLowerCase();
+    const score = getStringSimilarity(queryLower, eventName);
+    if (score > 0.5) {
+      return event;
+    }
+  }
+  
+  return null;
 }
 
 /**
