@@ -10,6 +10,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  */
 async function generateResponse(userQuery, campusData) {
   try {
+    // Verify API key is loaded
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY is not set in .env file');
+      return generateDemoResponse(userQuery, campusData);
+    }
+
     // Determine if we have campus data to work with
     const hasData = campusData && Object.keys(campusData).length > 0 && Object.values(campusData).some(arr => arr && arr.length > 0);
     
@@ -17,8 +23,10 @@ async function generateResponse(userQuery, campusData) {
     // Use lower temperature for campus data (more factual)
     const temperature = hasData ? 0.4 : 0.7;
     
+    console.log('🤖 Calling Gemini API with query:', userQuery.substring(0, 50) + '...');
+    
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
+      model: "gemini-1.5-flash",
       generationConfig: {
         maxOutputTokens: 1000,
         temperature: temperature,
@@ -31,9 +39,11 @@ async function generateResponse(userQuery, campusData) {
     const response = await result.response;
     const text = response.text();
 
+    console.log('✅ Gemini API response received successfully');
     return text || "I couldn't generate a response. Please try again.";
   } catch (error) {
-    console.error('Gemini API error:', error.message);
+    console.error('❌ Gemini API error:', error.message);
+    console.error('Error details:', error);
     
     // Fallback: Return a demo response if Gemini API fails
     console.log('📝 Using demo response mode (Gemini API unavailable)');
