@@ -220,7 +220,22 @@ async function fetchAndMatchEvents(query) {
   try {
     const snapshot = await db.collection("events").get();
     const allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return findBestMatches(query, { events: allEvents }, "events", 0.2, 100);
+    
+    // Check if user is asking for a specific event or all events
+    const queryLower = query.toLowerCase();
+    const isGeneralQuery = queryLower.includes('all events') || queryLower.includes('list all') || queryLower.includes('show all events') || queryLower.includes('upcoming events') || (queryLower.includes('list') && queryLower.includes('event'));
+    
+    // For specific event queries, return only 1 match with moderate threshold
+    // For general queries, return more with lower threshold
+    let limit = 1;
+    let threshold = 0.3;
+    
+    if (isGeneralQuery) {
+      limit = 100;
+      threshold = 0.1;
+    }
+    
+    return findBestMatches(query, { events: allEvents }, "events", threshold, limit);
   } catch (error) {
     console.error("Error fetching events:", error);
     return [];
@@ -236,7 +251,22 @@ async function fetchAndMatchClubs(query) {
   try {
     const snapshot = await db.collection("clubs").get();
     const allClubs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return findBestMatches(query, { clubs: allClubs }, "clubs", 0.2, 100);
+    
+    // Check if user is asking for a specific club or all clubs
+    const queryLower = query.toLowerCase();
+    const isGeneralQuery = queryLower.includes('all clubs') || queryLower.includes('list all') || queryLower.includes('show all clubs') || (queryLower.includes('list') && queryLower.includes('club'));
+    
+    // For specific club queries, return only 1 match with moderate threshold
+    // For general queries, return more with lower threshold
+    let limit = 1;
+    let threshold = 0.3;
+    
+    if (isGeneralQuery) {
+      limit = 100;
+      threshold = 0.1;
+    }
+    
+    return findBestMatches(query, { clubs: allClubs }, "clubs", threshold, limit);
   } catch (error) {
     console.error("Error fetching clubs:", error);
     return [];
@@ -252,7 +282,22 @@ async function fetchAndMatchFacilities(query) {
   try {
     const snapshot = await db.collection("facilities").get();
     const allFacilities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return findBestMatches(query, { facilities: allFacilities }, "facilities", 0.2, 100);
+    
+    // Check if user is asking for a specific facility or all facilities
+    const queryLower = query.toLowerCase();
+    const isGeneralQuery = queryLower.includes('all facilities') || queryLower.includes('list all') || queryLower.includes('show all facilities') || (queryLower.includes('list') && queryLower.includes('facilit'));
+    
+    // For specific facility queries, return only 1 match with moderate threshold
+    // For general queries, return more with lower threshold
+    let limit = 1;
+    let threshold = 0.3;
+    
+    if (isGeneralQuery) {
+      limit = 100;
+      threshold = 0.1;
+    }
+    
+    return findBestMatches(query, { facilities: allFacilities }, "facilities", threshold, limit);
   } catch (error) {
     console.error("Error fetching facilities:", error);
     return [];
