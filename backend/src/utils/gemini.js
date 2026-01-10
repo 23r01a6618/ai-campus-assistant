@@ -59,23 +59,30 @@ function generateDemoResponse(userQuery, campusData) {
   
   // If there's campus data, provide responses based on that
   if (campusData && Object.keys(campusData).length > 0) {
-    if (lowerQuery.includes('event')) {
-      return "🎉 We have several exciting events coming up! To see the full list, check the Admin Dashboard.";
+    if (lowerQuery.includes('facility') || lowerQuery.includes('facilities')) {
+      return "🏫 Our campus has excellent facilities including a modern library, computer labs, sports complex, and cafeteria. For specific facility information, check the Admin Dashboard to see all available facilities and their locations.";
+    } else if (lowerQuery.includes('event')) {
+      return "🎉 We have several exciting events coming up! Visit the app to see our event calendar with details about dates, times, venues, and organizers.";
     } else if (lowerQuery.includes('club')) {
-      return "🎓 We have many clubs on campus including Robotics, Tech, Sports, and Cultural clubs.";
-    } else if (lowerQuery.includes('facility') || lowerQuery.includes('library')) {
-      return "📚 Our campus has a central library, computer labs, gym, and cafeteria.";
+      return "🎓 We have diverse clubs on campus. Check out our club section to find clubs that match your interests, from academics to sports to arts.";
     } else if (lowerQuery.includes('exam') || lowerQuery.includes('registration')) {
-      return "📝 For exam registration and academic information, please contact the Academic Office.";
+      return "📝 For exam registration and academic information, contact the Academic Office or check the Admin Dashboard for important dates and schedules.";
     }
   }
   
-  // For general questions, provide helpful responses
-  if (lowerQuery.includes('how') || lowerQuery.includes('what') || lowerQuery.includes('when') || lowerQuery.includes('where')) {
-    return "👋 Thanks for your question! I'm currently in demo mode with limited capabilities. To get full AI-powered responses, please verify your Gemini API key in the .env file. In the meantime, I can still help you manage campus data through the Admin Dashboard.";
+  // For general questions, provide helpful responses based on query type
+  if (lowerQuery.includes('how') || lowerQuery.includes('what')) {
+    if (lowerQuery.includes('study')) {
+      return "📚 Effective study tips: Break topics into manageable chunks, use active recall, take regular breaks, form study groups, and review regularly. Start early and maintain consistency!";
+    } else if (lowerQuery.includes('exam')) {
+      return "✅ Exam preparation: Create a study schedule, understand key concepts, practice past papers, get adequate sleep before the exam, and manage exam anxiety through deep breathing.";
+    } else if (lowerQuery.includes('manage')) {
+      return "⏰ Time management: Prioritize tasks by importance, use the Pomodoro technique, minimize distractions, plan your day, and review your progress regularly.";
+    }
   }
   
-  return "👋 I'm here to help! Right now I'm running in demo mode. Enable your Gemini API key to get full AI responses for any question you ask.";
+  // Default helpful response
+  return "👋 I'm the Campus AI Assistant! I can help you with questions about campus events, clubs, facilities, exams, and general academic advice. What would you like to know?";
 }
 
 /**
