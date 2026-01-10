@@ -10,11 +10,18 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  */
 async function generateResponse(userQuery, campusData) {
   try {
+    // Determine if we have campus data to work with
+    const hasData = campusData && Object.keys(campusData).length > 0 && Object.values(campusData).some(arr => arr && arr.length > 0);
+    
+    // Use slightly higher temperature for general knowledge (more creative/thoughtful)
+    // Use lower temperature for campus data (more factual)
+    const temperature = hasData ? 0.4 : 0.7;
+    
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
       generationConfig: {
-        maxOutputTokens: 800,
-        temperature: 0.4, // Slightly higher for more natural responses
+        maxOutputTokens: 1000,
+        temperature: temperature,
       }
     });
 
@@ -89,36 +96,41 @@ function buildPrompt(userQuery, campusData) {
     });
   }
 
-  const basePrompt = `You are an intelligent and helpful AI assistant for our campus community. You have knowledge about campus events, clubs, facilities, dining options, and academic matters. You also have general knowledge to answer any questions users ask.
+  const basePrompt = `You are an intelligent and helpful AI assistant for our campus community. You have knowledge about campus events, clubs, facilities, dining options, and academic matters. You also have extensive general knowledge to answer any questions users ask.
 
 YOUR ROLE:
 - Provide helpful, accurate information about campus-related topics using the data below
 - If campus data is available, prioritize it in your response
-- If no specific campus data matches the query, use your general knowledge to provide helpful information
+- If no specific campus data matches the query, use your general knowledge to provide THOUGHTFUL, DETAILED answers
 - Give friendly, conversational responses (not robotic)
 - Answer ANY question the user asks, whether campus-related or general knowledge
+- Think deeply and provide practical, actionable information
 
 ${hasData ? `AVAILABLE CAMPUS DATA:
 ${dataString}
 
 INSTRUCTIONS:
-1. If the user's question relates to the campus data above, use that information
-2. If the campus data doesn't answer the question, provide general knowledge-based answers
+1. If the user's question relates to the campus data above, use that information and enhance with helpful context
+2. If the campus data doesn't answer the question, provide comprehensive general knowledge-based answers
 3. Be helpful, accurate, and conversational while remaining factual
 4. For menu/food items: Format nicely with prices and availability clearly shown
 5. For specific item queries (price, availability): Provide direct, clear answers
-6. Keep responses friendly and concise (2-4 sentences typically)
-7. Use relevant emojis to make responses more engaging` : `INSTRUCTIONS:
-1. The user is asking a question that isn't specifically about this campus's database
-2. Use your general knowledge to provide a helpful, accurate answer
-3. Be friendly, conversational, and informative
-4. If the question is somewhat campus-related (like "how to study effectively"), provide practical advice
-5. Keep responses friendly and concise (2-4 sentences typically)
-6. Use relevant emojis to make responses more engaging`}
+6. For general knowledge questions: Think deeply and provide practical, actionable advice
+7. Keep responses friendly and concise (2-4 sentences typically)
+8. Use relevant emojis to make responses more engaging` : `INSTRUCTIONS:
+1. The user is asking a question that isn't in this campus's database
+2. Use your general knowledge and THINK DEEPLY about the topic to provide a helpful, thorough answer
+3. Be friendly, conversational, informative, and practical
+4. Provide actionable advice and real insights based on your knowledge
+5. For exam-related questions: Discuss study strategies, time management, preparation tips, etc.
+6. For academic topics: Provide explanations, examples, and practical guidance
+7. Keep responses friendly and concise but substantive (3-5 sentences is fine for complex topics)
+8. Use relevant emojis to make responses more engaging`}
 
 USER QUESTION: ${userQuery}
 
-RESPONSE:`;
+RESPONSE:
+Think carefully about the question and provide a thoughtful, helpful answer based on your knowledge.`;
 
   return basePrompt;
 }
