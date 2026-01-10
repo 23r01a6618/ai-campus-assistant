@@ -18,66 +18,55 @@ async function generateResponse(userQuery, campusData) {
     
     const prompt = buildPrompt(userQuery, campusData);
 
-    // Try multiple endpoints and models
-    const endpoints = [
-      {
-        url: `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-2.0-flash'
-      },
-      {
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-1.5-pro'
-      },
-      {
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-pro'
-      }
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`  Trying ${endpoint.model}...`);
-        
-        const response = await axios.post(
-          endpoint.url,
-          {
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.9,
-              maxOutputTokens: 1500
-            },
-            safetySettings: [
-              {
-                category: "HARM_CATEGORY_UNSPECIFIED",
-                threshold: "BLOCK_NONE"
-              }
-            ]
-          },
-          {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 15000
+    // Use the simplest, most reliable endpoint
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    
+    try {
+      console.log('  Trying gemini-pro...');
+      
+      const response = await axios.post(
+        url,
+        {
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 2048
           }
-        );
-
-        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const text = response.data.candidates[0].content.parts[0].text;
-          console.log(`✅ ${endpoint.model} response received`);
-          return text;
+        },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 20000
         }
-      } catch (err) {
-        console.log(`  ⚠️ ${endpoint.model} failed:`, err.response?.status || err.message);
-        // Continue to next endpoint
-        continue;
-      }
-    }
+      );
 
-    // If all endpoints fail, use demo
-    console.log('❌ All Gemini endpoints failed');
-    return generateDemoResponse(userQuery, campusData);
+      if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const text = response.data.candidates[0].content.parts[0].text;
+        console.log('✅ Gemini API response received');
+        return text;
+      }
+
+      console.log('⚠️ Unexpected response format');
+      return generateDemoResponse(userQuery, campusData);
+
+    } catch (err) {
+      console.log('  ⚠️ gemini-pro failed:', err.response?.status || err.message);
+      
+      // If 400 error, show what went wrong
+      if (err.response?.status === 400) {
+        console.error('  Error details:', err.response?.data?.error?.message);
+      }
+      
+      return generateDemoResponse(userQuery, campusData);
+    }
 
   } catch (error) {
     console.error('❌ Gemini error:', error.message);
