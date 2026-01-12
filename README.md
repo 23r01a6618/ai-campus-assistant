@@ -2,6 +2,9 @@
 
 A 24/7 AI-powered chat system that centralizes campus information (events, clubs, policies, facilities) into one intelligent platform.
 
+## Deployment Link
+- https://ai-campus-assistant-ysow.onrender.com
+
 ## 📋 Project Overview
 
 - **Frontend**: React + Vite (Fast development)
