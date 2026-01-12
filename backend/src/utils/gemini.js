@@ -96,8 +96,8 @@ function generateDemoResponse(userQuery, campusData) {
       return `🏢 Here are the facilities available: ${facilityNames}. These are great resources for your academic and extracurricular needs. Visit the Admin Dashboard for more details about locations and opening hours.`;
     }
     if (campusData.canteen_items && campusData.canteen_items.length > 0) {
-      const items = campusData.canteen_items.slice(0, 3).map(c => \`\${c.name || c.itemName} ($\${c.price || 'N/A'})\`).join(', ');
-      return \`🍽️ Here are some items from our canteen: \${items}, and more! Check the menu above for complete options and availability.\`;
+      const items = campusData.canteen_items.slice(0, 3).map(c => `${c.name || c.itemName} ($${c.price || 'N/A'})`).join(', ');
+      return `🍽️ Here are some items from our canteen: ${items}, and more! Check the menu above for complete options and availability.`;
     }
     if (campusData.academic_info && campusData.academic_info.length > 0) {
       return `📚 Here's important academic information: ${campusData.academic_info.map(a => a.info || a.description).join('; ')} Contact the Academic Office for more details!`;

@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // 🔥 IMPORTANT CHANGE
-// Use Vite proxy instead of localhost or env URL
-const API_BASE_URL = '/api';
+// Use environment variable or fallback to proxy
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Send message to chat API - Returns structured data
