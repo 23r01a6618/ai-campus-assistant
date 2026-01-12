@@ -15,26 +15,33 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [userToken, setUserToken] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
+  const [initError, setInitError] = useState('');
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const token = await currentUser.getIdToken();
-        setUserToken(token);
-        
-        // Check if user is admin (you'd need to set this in Firebase custom claims)
-        const claims = (await currentUser.getIdTokenResult()).claims;
-        setIsAdmin(claims.admin || false);
-      } else {
-        setUser(null);
-        setUserToken(null);
-        setIsAdmin(false);
-      }
-      setLoading(false);
-    });
+    try {
+      const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+        if (currentUser) {
+          setUser(currentUser);
+          const token = await currentUser.getIdToken();
+          setUserToken(token);
+          
+          // Check if user is admin (you'd need to set this in Firebase custom claims)
+          const claims = (await currentUser.getIdTokenResult()).claims;
+          setIsAdmin(claims.admin || false);
+        } else {
+          setUser(null);
+          setUserToken(null);
+          setIsAdmin(false);
+        }
+        setLoading(false);
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (error) {
+      console.error('Firebase initialization error:', error);
+      setInitError(error.message);
+      setLoading(false);
+    }
   }, []);
 
   const handleLogin = async (e) => {
@@ -74,6 +81,18 @@ export default function App() {
 
   if (loading) {
     return <div className="loading-container">Loading...</div>;
+  }
+
+  if (initError) {
+    return (
+      <div className="auth-container">
+        <div className="auth-box" style={{ textAlign: 'center', padding: '40px' }}>
+          <h1>⚠️ Configuration Error</h1>
+          <p style={{ color: 'red', marginTop: '20px' }}>{initError}</p>
+          <p style={{ marginTop: '20px', fontSize: '14px' }}>Please ensure Firebase credentials are properly configured.</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
