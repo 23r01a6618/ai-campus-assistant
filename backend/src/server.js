@@ -19,6 +19,8 @@ app.use(cors({
 
 // Serve static files from frontend build
 const frontendBuildPath = path.join(__dirname, '../../frontend/dist');
+console.log(`📁 Frontend build path: ${frontendBuildPath}`);
+console.log(`✅ Frontend dist exists: ${require('fs').existsSync(frontendBuildPath)}`);
 app.use(express.static(frontendBuildPath));
 app.use(express.json());
 
