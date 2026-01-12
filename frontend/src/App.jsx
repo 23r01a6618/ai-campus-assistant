@@ -5,19 +5,26 @@ import ChatInterface from './components/ChatInterface';
 import AdminDashboard from './components/AdminDashboard';
 import './styles/App.css';
 
+const DEMO_MODE = !import.meta.env.VITE_FIREBASE_API_KEY; // Enable demo if Firebase not configured
+
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(DEMO_MODE ? { email: 'demo@campus.edu', uid: 'demo-user' } : null);
+  const [isAdmin, setIsAdmin] = useState(DEMO_MODE);
+  const [loading, setLoading] = useState(!DEMO_MODE);
   const [authMode, setAuthMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
-  const [userToken, setUserToken] = useState(null);
+  const [userToken, setUserToken] = useState(DEMO_MODE ? 'demo-token' : null);
   const [activeTab, setActiveTab] = useState('chat');
   const [initError, setInitError] = useState('');
 
   useEffect(() => {
+    if (DEMO_MODE) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
         if (currentUser) {
@@ -25,7 +32,6 @@ export default function App() {
           const token = await currentUser.getIdToken();
           setUserToken(token);
           
-          // Check if user is admin (you'd need to set this in Firebase custom claims)
           const claims = (await currentUser.getIdTokenResult()).claims;
           setIsAdmin(claims.admin || false);
         } else {
@@ -48,6 +54,16 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     
+    if (DEMO_MODE) {
+      // Demo mode - auto login
+      setUser({ email: email || 'demo@campus.edu', uid: 'demo-user' });
+      setUserToken('demo-token');
+      setIsAdmin(true);
+      setEmail('');
+      setPassword('');
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
       setEmail('');
@@ -61,6 +77,16 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     
+    if (DEMO_MODE) {
+      // Demo mode - auto signup
+      setUser({ email: email || 'demo@campus.edu', uid: 'demo-user' });
+      setUserToken('demo-token');
+      setIsAdmin(true);
+      setEmail('');
+      setPassword('');
+      return;
+    }
+
     try {
       await createUserWithEmailAndPassword(auth, email, password);
       setEmail('');
@@ -72,8 +98,15 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      if (!DEMO_MODE) {
+        await signOut(auth);
+      }
+      setUser(null);
+      setUserToken(null);
+      setIsAdmin(false);
       setActiveTab('chat');
+      setEmail('');
+      setPassword('');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -102,6 +135,19 @@ export default function App() {
           <h1>🎓 Campus AI Assistant</h1>
           <p>Your 24/7 campus information hub</p>
 
+          {DEMO_MODE && (
+            <div style={{ 
+              backgroundColor: '#e3f2fd', 
+              padding: '12px', 
+              borderRadius: '4px', 
+              marginBottom: '16px',
+              fontSize: '14px',
+              color: '#1565c0'
+            }}>
+              📋 Demo Mode Enabled - Use any credentials to login
+            </div>
+          )}
+
           <div className="auth-tabs">
             <button 
               className={`tab ${authMode === 'login' ? 'active' : ''}`}
@@ -124,7 +170,7 @@ export default function App() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder={DEMO_MODE ? "any@email.com" : "your@email.com"}
                 required
               />
             </div>
